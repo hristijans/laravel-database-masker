@@ -1,0 +1,47 @@
+{
+    "name": "hrisitjans/laravel-database-masker",
+    "description": "Laravel package for creating masked database dumps with sensitive data obfuscated",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hristijan Stojanoski",
+            "email": "kde.chris@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": "^7.4|^8.0",
+        "illuminate/support": "^8.0|^9.0|^10.0",
+        "illuminate/console": "^8.0|^9.0|^10.0",
+        "illuminate/database": "^8.0|^9.0|^10.0",
+        "fakerphp/faker": "^1.9.1"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^6.0|^7.0|^8.0",
+        "phpunit/phpunit": "^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Hristijans\\DatabaseMasker\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hristijans\\DatabaseMasker\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Hristijans\\DatabaseMasker\\DatabaseMaskerServiceProvider"
+            ],
+            "aliases": {
+                "DatabaseMasker": "Hristijans\\DatabaseMasker\\Facades\\DatabaseMasker"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    }
+}
