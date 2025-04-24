@@ -173,7 +173,7 @@ If you discover any security-related issues, please email kde.chris@gmail.com in
 
 ## Credits
 
-- [Your Name](https://github.com/hristijans)
+- [Hristijan Stojanoski](https://github.com/hristijans)
 
 
 ## License
