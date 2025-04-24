@@ -2,8 +2,8 @@
 
 namespace Hristijans\DatabaseMasker\Commands;
 
-use Illuminate\Console\Command;
 use Hristijans\DatabaseMasker\Facades\DatabaseMasker;
+use Illuminate\Console\Command;
 
 class MaskDumpCommand extends Command
 {
@@ -31,35 +31,36 @@ class MaskDumpCommand extends Command
     public function handle()
     {
         $this->info('Creating masked database dump...');
-        
+
         // Load custom config if provided
         if ($configPath = $this->option('config')) {
-            if (!file_exists($configPath)) {
+            if (! file_exists($configPath)) {
                 $this->error("Config file not found: {$configPath}");
+
                 return 1;
             }
-            
+
             $customConfig = include $configPath;
             config(['database-masker' => $customConfig]);
         }
-        
+
         try {
             $startTime = microtime(true);
             $outputPath = DatabaseMasker::createMaskedDump($this->option('output'));
             $endTime = microtime(true);
-            
-            $this->info("Masked database dump created successfully!");
+
+            $this->info('Masked database dump created successfully!');
             $this->info("Output file: {$outputPath}");
-            $this->info("Time taken: " . round($endTime - $startTime, 2) . " seconds");
-            
+            $this->info('Time taken: '.round($endTime - $startTime, 2).' seconds');
+
             return 0;
         } catch (\Exception $e) {
-            $this->error("Error creating masked database dump: " . $e->getMessage());
-            
+            $this->error('Error creating masked database dump: '.$e->getMessage());
+
             if ($this->getOutput()->isVerbose()) {
                 $this->error($e->getTraceAsString());
             }
-            
+
             return 1;
         }
     }

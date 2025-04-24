@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @method static string createMaskedDump(?string $outputFile = null)
  * @method static bool restoreMaskedDump(?string $inputFile = null)
- * 
+ *
  * @see \Hristijans\DatabaseMasker\DatabaseMasker
  */
 class DatabaseMasker extends Facade

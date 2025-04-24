@@ -10,8 +10,6 @@ class DatabaseMaskerTest extends TestCase
 {
     /**
      * Set up the test environment.
-     *
-     * @return void
      */
     protected function setUp(): void
     {
@@ -81,8 +79,6 @@ class DatabaseMaskerTest extends TestCase
 
     /**
      * Clean up test tables.
-     *
-     * @return void
      */
     protected function tearDown(): void
     {
@@ -97,7 +93,7 @@ class DatabaseMaskerTest extends TestCase
      *
      * @return void
      */
-    public function testServiceProviderIsLoaded()
+    public function test_service_provider_is_loaded()
     {
         $this->assertTrue($this->app->bound('database-masker'));
     }
@@ -107,7 +103,7 @@ class DatabaseMaskerTest extends TestCase
      *
      * @return void
      */
-    public function testConfigurationIsPublished()
+    public function test_configuration_is_published()
     {
         $this->assertTrue(is_array(config('database-masker')));
     }
@@ -117,7 +113,7 @@ class DatabaseMaskerTest extends TestCase
      *
      * @return void
      */
-    public function testGetTables()
+    public function test_get_tables()
     {
         $tables = $this->invokeMethod(app('database-masker'), 'getTables', []);
         $this->assertContains('test_users', $tables);
@@ -129,7 +125,7 @@ class DatabaseMaskerTest extends TestCase
      *
      * @return void
      */
-    public function testMaskValue()
+    public function test_mask_value()
     {
         $masker = app('database-masker');
 
@@ -152,7 +148,6 @@ class DatabaseMaskerTest extends TestCase
      *
      * @param  object  $object
      * @param  string  $methodName
-     * @param  array   $parameters
      * @return mixed
      */
     public function invokeMethod($object, $methodName, array $parameters = [])
@@ -169,7 +164,7 @@ class DatabaseMaskerTest extends TestCase
      *
      * @return void
      */
-    public function testCreateMaskedDump()
+    public function test_create_masked_dump()
     {
         config(['database-masker.tables' => [
             'test_users' => [

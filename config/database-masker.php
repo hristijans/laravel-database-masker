@@ -23,7 +23,7 @@ return [
                 'password' => ['type' => 'password'],
             ],
         ],
-        
+
         // Example for customers table
         'customers' => [
             'columns' => [
@@ -38,7 +38,7 @@ return [
                 'notes' => ['type' => 'text', 'length' => 200],
             ],
         ],
-        
+
         // Example for payments table
         'payments' => [
             'columns' => [
@@ -48,10 +48,10 @@ return [
                 'transaction_id' => ['type' => 'bothify', 'format' => '??####??####'],
             ],
         ],
-        
+
         // Add more tables as needed
     ],
-    
+
     /*
     |--------------------------------------------------------------------------
     | Excluded Tables
@@ -72,7 +72,7 @@ return [
         'telescope_entries_tags',
         'telescope_monitoring',
     ],
-    
+
     /*
     |--------------------------------------------------------------------------
     | Global Configuration
@@ -84,7 +84,7 @@ return [
     'preserve_primary_keys' => true,  // Keep the original primary key values
     'preserve_foreign_keys' => true,  // Keep foreign key relationships intact
     'batch_size' => 1000,            // Number of records to process at once
-    
+
     /*
     |--------------------------------------------------------------------------
     | Available Mask Types
@@ -118,7 +118,7 @@ return [
     | - password: Replaces with a bcrypt hash of a random password
     |
     */
-    
+
     /*
     |--------------------------------------------------------------------------
     | Column Type Mapping
@@ -155,4 +155,4 @@ return [
         'varbinary' => 'sha256',
         'blob' => 'sha256',
     ],
-]
+];

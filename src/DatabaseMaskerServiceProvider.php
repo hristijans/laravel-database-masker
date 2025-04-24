@@ -2,9 +2,9 @@
 
 namespace Hristijans\DatabaseMasker;
 
-use Illuminate\Support\ServiceProvider;
 use Hristijans\DatabaseMasker\Commands\MaskDumpCommand;
 use Hristijans\DatabaseMasker\Commands\MaskRestoreCommand;
+use Illuminate\Support\ServiceProvider;
 
 class DatabaseMaskerServiceProvider extends ServiceProvider
 {
@@ -20,13 +20,13 @@ class DatabaseMaskerServiceProvider extends ServiceProvider
                 MaskDumpCommand::class,
                 MaskRestoreCommand::class,
             ]);
-            
+
             $this->publishes([
-                __DIR__ . '/../config/database-masker.php' => config_path('database-masker.php'),
+                __DIR__.'/../config/database-masker.php' => config_path('database-masker.php'),
             ], 'config');
         }
     }
-    
+
     /**
      * Register the application services.
      *
@@ -35,9 +35,9 @@ class DatabaseMaskerServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/database-masker.php', 'database-masker'
+            __DIR__.'/../config/database-masker.php', 'database-masker'
         );
-        
+
         $this->app->singleton('database-masker', function ($app) {
             return new DatabaseMasker($app);
         });
