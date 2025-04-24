@@ -1,5 +1,5 @@
 {
-    "name": "hrisitjans/laravel-database-masker",
+    "name": "hristijans/laravel-database-masker",
     "description": "Laravel package for creating masked database dumps with sensitive data obfuscated",
     "type": "library",
     "license": "MIT",
