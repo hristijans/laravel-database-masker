@@ -3,14 +3,60 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Tables Configuration
+    | Database Connections Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define which database connections should be processed and which tables
+    | and columns in each connection contain confidential data.
+    |
+    | If 'connections' is empty, the default connection will be used with the
+    | tables configuration defined at the root level.
+    |
+    */
+    'connections' => [
+        // Examples of multiple database connections
+        // 'mysql' => [
+        //     'tables' => [
+        //         'users' => [
+        //             'columns' => [
+        //                 'email' => ['type' => 'email'],
+        //                 'name' => ['type' => 'name'],
+        //             ],
+        //         ],
+        //     ],
+        //     'exclude_tables' => [
+        //         'migrations',
+        //         'failed_jobs',
+        //     ],
+        //     'output_file' => 'masked_mysql.sql',
+        // ],
+        // 'second_db' => [
+        //     'tables' => [
+        //         'customers' => [
+        //             'columns' => [
+        //                 'email' => ['type' => 'email'],
+        //                 'first_name' => ['type' => 'firstName'],
+        //                 'last_name' => ['type' => 'lastName'],
+        //             ],
+        //         ],
+        //     ],
+        //     'exclude_tables' => [
+        //         'migrations',
+        //     ],
+        //     'output_file' => 'masked_second_db.sql',
+        // ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tables Configuration (for default connection)
     |--------------------------------------------------------------------------
     |
     | Define which tables and columns contain confidential data that should be
     | masked when creating a database dump for development or testing purposes.
     |
-    | For each table, specify the columns that need masking and the type of
-    | masking to apply.
+    | This configuration is used when no specific connections are defined or
+    | for backward compatibility.
     |
     */
     'tables' => [
@@ -38,23 +84,11 @@ return [
                 'notes' => ['type' => 'text', 'length' => 200],
             ],
         ],
-
-        // Example for payments table
-        'payments' => [
-            'columns' => [
-                'card_number' => ['type' => 'creditCardNumber'],
-                'card_holder' => ['type' => 'name'],
-                'amount' => ['type' => 'randomNumber', 'min' => 10, 'max' => 1000],
-                'transaction_id' => ['type' => 'bothify', 'format' => '??####??####'],
-            ],
-        ],
-
-        // Add more tables as needed
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Excluded Tables
+    | Excluded Tables (for default connection)
     |--------------------------------------------------------------------------
     |
     | List of tables that should be excluded from the masked database dump.
@@ -68,9 +102,6 @@ return [
         'personal_access_tokens',
         'jobs',
         'sessions',
-        'telescope_entries',
-        'telescope_entries_tags',
-        'telescope_monitoring',
     ],
 
     /*
@@ -84,6 +115,7 @@ return [
     'preserve_primary_keys' => true,  // Keep the original primary key values
     'preserve_foreign_keys' => true,  // Keep foreign key relationships intact
     'batch_size' => 1000,            // Number of records to process at once
+    'output_path' => null,           // Default output path (null = storage_path('app'))
 
     /*
     |--------------------------------------------------------------------------
