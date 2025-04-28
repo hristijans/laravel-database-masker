@@ -1,155 +1,223 @@
 <?php
 
-namespace Hristijans\DatabaseMasker;
+declare(strict_types=1);
 
-use Exception;
-use Faker\Factory as FakerFactory;
+namespace Hristijans\DatabaseMasker\Services;
+
+use Hristijans\DatabaseMasker\Contracts\DatabaseDriverInterface;
+use Hristijans\DatabaseMasker\Contracts\DatabaseMaskerInterface;
+use Hristijans\DatabaseMasker\Exceptions\DatabaseDriverException;
+use Hristijans\DatabaseMasker\Services\Factories\DatabaseDriverFactory;
+use Hristijans\DatabaseMasker\Services\Factories\MaskerStrategyFactory;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\File;
 
-class DatabaseMasker
+final class DatabaseMasker implements DatabaseMaskerInterface
 {
     /**
      * The application instance.
-     *
-     * @var \Illuminate\Foundation\Application
      */
-    protected $app;
+    private Application $app;
 
     /**
-     * The Faker instance.
-     *
-     * @var \Faker\Generator
+     * The masker factory.
      */
-    protected $faker;
+    private MaskerStrategyFactory $maskerFactory;
+
+    /**
+     * The driver factory.
+     */
+    private DatabaseDriverFactory $driverFactory;
 
     /**
      * The configuration.
      *
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $config;
-
-    /**
-     * The database connection.
-     *
-     * @var \Illuminate\Database\Connection
-     */
-    protected $connection;
+    private array $config;
 
     /**
      * The temporary SQL file path.
-     *
-     * @var string
      */
-    protected $tempSqlFile;
+    private string $tempSqlFile;
 
     /**
      * Create a new DatabaseMasker instance.
-     *
-     * @param  \Illuminate\Foundation\Application  $app
-     * @return void
      */
-    public function __construct($app)
+    public function __construct(Application $app, MaskerStrategyFactory $maskerFactory)
     {
         $this->app = $app;
-        $this->faker = FakerFactory::create();
+        $this->maskerFactory = $maskerFactory;
+        $this->driverFactory = new DatabaseDriverFactory($maskerFactory);
         $this->config = config('database-masker');
-        $this->connection = DB::connection();
         $this->tempSqlFile = storage_path('app/masked_database.sql');
+    }
+
+    /**
+     * Create masked database dumps for all configured connections.
+     *
+     * @param  string|null  $outputPath  Base path for output files
+     * @return array<string, array{status: string, connection: string, output_file?: string, tables_processed?: int, error?: string}>
+     */
+    public function createMaskedDumps(?string $outputPath = null): array
+    {
+        $results = [];
+        $connections = $this->getConfiguredConnections();
+        $outputPath = $outputPath ?? $this->config['output_path'] ?? storage_path('app');
+
+        // Create output directory if it doesn't exist
+        if (! File::exists($outputPath)) {
+            File::makeDirectory($outputPath, 0755, true);
+        }
+
+        foreach ($connections as $connectionName => $connectionConfig) {
+            try {
+                $outputFile = $connectionConfig['output_file'] ?? "masked_database_{$connectionName}.sql";
+                $fullOutputPath = rtrim($outputPath, '/').'/'.$outputFile;
+
+                $results[$connectionName] = $this->createMaskedDumpForConnection(
+                    $connectionName,
+                    $connectionConfig,
+                    $fullOutputPath
+                );
+            } catch (\Exception $e) {
+                $results[$connectionName] = [
+                    'status' => 'error',
+                    'connection' => $connectionName,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Create a masked database dump for a specific connection.
+     *
+     * @param  array<string, mixed>  $connectionConfig
+     * @return array{status: string, connection: string, output_file?: string, tables_processed?: int, error?: string}
+     */
+    public function createMaskedDumpForConnection(string $connectionName, array $connectionConfig, ?string $outputFile = null): array
+    {
+        // Get the database connection
+        $connection = DB::connection($connectionName);
+
+        // Create appropriate driver for this database
+        $driver = $this->driverFactory->createDriver($connection, $connectionName);
+
+        // Set output file
+        if (! $outputFile) {
+            $outputFile = storage_path('app/masked_database_'.$connectionName.'.sql');
+        }
+
+        // Start the SQL file with header
+        $driver->initSqlFile($outputFile, $connectionName);
+
+        // Get all tables excluding the ones in the exclude list
+        $excludeTables = $connectionConfig['exclude_tables'] ?? [];
+        $tables = $driver->getTables($excludeTables);
+
+        $tablesProcessed = 0;
+        foreach ($tables as $table) {
+            // If tables are explicitly configured, only process those
+            $configuredTables = array_keys($connectionConfig['tables'] ?? []);
+            if (! empty($configuredTables) && ! in_array($table, $configuredTables)) {
+                continue;
+            }
+
+            $this->processMaskTable(
+                $driver,
+                $table,
+                $outputFile,
+                $connectionConfig['tables'][$table] ?? null
+            );
+            $tablesProcessed++;
+        }
+
+        // Finalize the SQL file
+        $driver->finalizeSqlFile($outputFile);
+
+        return [
+            'status' => 'success',
+            'connection' => $connectionName,
+            'output_file' => $outputFile,
+            'tables_processed' => $tablesProcessed,
+        ];
     }
 
     /**
      * Create a masked database dump.
      *
-     * @param  string|null  $outputFile
-     * @return string
+     * This method is kept for backward compatibility.
      */
-    public function createMaskedDump($outputFile = null)
+    public function createMaskedDump(?string $outputFile = null): string
     {
         if (! $outputFile) {
             $outputFile = $this->tempSqlFile;
         }
 
-        // Start the SQL file with drop and recreate statements
-        $this->initSqlFile($outputFile);
+        // Use default connection config
+        $defaultConnection = config('database.default');
+        $connectionConfig = [
+            'tables' => $this->config['tables'] ?? [],
+            'exclude_tables' => $this->config['exclude_tables'] ?? [],
+        ];
 
-        // Get all tables excluding the ones in the exclude list
-        $tables = $this->getTables();
+        $result = $this->createMaskedDumpForConnection($defaultConnection, $connectionConfig, $outputFile);
 
-        foreach ($tables as $table) {
-            $this->processMaskTable($table, $outputFile);
-        }
-
-        // Add foreign key checks back
-        file_put_contents($outputFile, "\nSET FOREIGN_KEY_CHECKS=1;\n", FILE_APPEND);
-
-        return $outputFile;
+        return $result['output_file'];
     }
 
     /**
      * Restore the masked database dump.
      *
-     * @param  string|null  $inputFile
-     * @return bool
-     *
-     * @throws \Exception
+     * @throws DatabaseDriverException
      */
-    public function restoreMaskedDump($inputFile = null)
+    public function restoreMaskedDump(?string $inputFile = null, ?string $connectionName = null): bool
     {
         if (! $inputFile) {
             $inputFile = $this->tempSqlFile;
         }
 
         if (! file_exists($inputFile)) {
-            throw new Exception("Masked database dump file not found: {$inputFile}");
+            throw new DatabaseDriverException("Masked database dump file not found: {$inputFile}");
         }
 
-        // Execute the SQL file
-        $dbConfig = config('database.connections.'.config('database.default'));
+        // Set the connection
+        $connectionName = $connectionName ?? config('database.default');
+        $connection = DB::connection($connectionName);
 
-        $command = sprintf(
-            'mysql -h%s -u%s -p%s %s < %s',
-            escapeshellarg($dbConfig['host']),
-            escapeshellarg($dbConfig['username']),
-            escapeshellarg($dbConfig['password']),
-            escapeshellarg($dbConfig['database']),
-            escapeshellarg($inputFile)
-        );
+        // Create appropriate driver
+        $driver = $this->driverFactory->createDriver($connection, $connectionName);
 
-        $output = null;
-        $returnVar = null;
+        // Get connection config
+        $dbConfig = config("database.connections.{$connectionName}");
 
-        exec($command, $output, $returnVar);
-
-        if ($returnVar !== 0) {
-            throw new Exception('Failed to restore database: '.implode("\n", $output));
-        }
-
-        return true;
+        // Restore the dump
+        return $driver->restoreDump($inputFile, $dbConfig);
     }
 
     /**
      * Process and mask a single table.
      *
-     * @param  string  $table
-     * @param  string  $outputFile
-     * @return void
+     * @param  array<string, mixed>|null  $tableConfig
      */
-    protected function processMaskTable($table, $outputFile)
-    {
-        // Skip if in exclude list
-        if (in_array($table, $this->config['exclude_tables'] ?? [])) {
-            return;
-        }
-
+    private function processMaskTable(
+        DatabaseDriverInterface $driver,
+        string $table,
+        string $outputFile,
+        ?array $tableConfig = null
+    ): void {
         // Get table structure
-        $createTableSql = $this->getCreateTableSql($table);
+        $createTableSql = $driver->getCreateTableSql($table);
         file_put_contents($outputFile, $createTableSql."\n\n", FILE_APPEND);
 
         // Process data in batches
         $batchSize = $this->config['batch_size'] ?? 1000;
-        $totalRows = DB::table($table)->count();
+        $connection = DB::connection();
+        $totalRows = $connection->table($table)->count();
 
         if ($totalRows === 0) {
             return;
@@ -159,306 +227,42 @@ class DatabaseMasker
 
         for ($i = 0; $i < $batches; $i++) {
             $offset = $i * $batchSize;
-            $records = DB::table($table)->offset($offset)->limit($batchSize)->get();
+            $records = $connection->table($table)
+                ->offset($offset)
+                ->limit($batchSize)
+                ->get();
 
             if ($records->isEmpty()) {
                 continue;
             }
 
-            $insertSql = $this->generateInsertSql($table, $records);
+            $insertSql = $driver->generateInsertSql($table, $records, $tableConfig);
             file_put_contents($outputFile, $insertSql."\n\n", FILE_APPEND);
         }
     }
 
     /**
-     * Generate SQL INSERT statements with masked data.
+     * Get configured database connections.
      *
-     * @param  string  $table
-     * @param  \Illuminate\Support\Collection  $records
-     * @return string
+     * @return array<string, array<string, mixed>>
      */
-    protected function generateInsertSql($table, $records)
+    private function getConfiguredConnections(): array
     {
-        $columns = Schema::getColumnListing($table);
-        $tableConfig = $this->config['tables'][$table] ?? null;
-        $maskColumns = $tableConfig['columns'] ?? [];
+        $connections = $this->config['connections'] ?? [];
 
-        $insertSql = "INSERT INTO `{$table}` (`".implode('`, `', $columns)."`) VALUES\n";
-        $valuesSql = [];
+        // If no connections are explicitly configured, use the default connection
+        // with the top-level tables configuration
+        if (empty($connections)) {
+            $defaultConnection = config('database.default');
 
-        foreach ($records as $record) {
-            $values = [];
-
-            foreach ($columns as $column) {
-                $value = $record->$column;
-
-                // Determine if this column should be masked
-                if (isset($maskColumns[$column])) {
-                    $value = $this->maskValue($value, $maskColumns[$column]);
-                }
-
-                // Format value for SQL
-                $values[] = $this->formatSqlValue($value);
-            }
-
-            $valuesSql[] = '('.implode(', ', $values).')';
+            return [
+                $defaultConnection => [
+                    'tables' => $this->config['tables'] ?? [],
+                    'exclude_tables' => $this->config['exclude_tables'] ?? [],
+                ],
+            ];
         }
 
-        return $insertSql.implode(",\n", $valuesSql).';';
-    }
-
-    /**
-     * Mask a value based on configuration.
-     *
-     * @param  mixed  $originalValue
-     * @param  array  $columnConfig
-     * @return mixed
-     */
-    protected function maskValue($originalValue, $columnConfig)
-    {
-        $type = $columnConfig['type'] ?? 'text';
-
-        switch ($type) {
-            case 'email':
-                return $this->faker->safeEmail();
-
-            case 'name':
-                return $this->faker->name();
-
-            case 'firstName':
-                return $this->faker->firstName();
-
-            case 'lastName':
-                return $this->faker->lastName();
-
-            case 'phone':
-                return $this->faker->phoneNumber();
-
-            case 'address':
-                return $this->faker->address();
-
-            case 'city':
-                return $this->faker->city();
-
-            case 'country':
-                return $this->faker->country();
-
-            case 'postcode':
-                return $this->faker->postcode();
-
-            case 'text':
-                $length = $columnConfig['length'] ?? 100;
-
-                return $this->faker->text($length);
-
-            case 'number':
-            case 'randomNumber':
-                $min = $columnConfig['min'] ?? 1;
-                $max = $columnConfig['max'] ?? 1000;
-
-                return $this->faker->numberBetween($min, $max);
-
-            case 'date':
-                $format = $columnConfig['format'] ?? 'Y-m-d';
-
-                return $this->faker->date($format);
-
-            case 'datetime':
-                $format = $columnConfig['format'] ?? 'Y-m-d H:i:s';
-
-                return $this->faker->dateTime()->format($format);
-
-            case 'numerify':
-                $format = $columnConfig['format'] ?? '###';
-
-                return $this->faker->numerify($format);
-
-            case 'lexify':
-                $format = $columnConfig['format'] ?? '????';
-
-                return $this->faker->lexify($format);
-
-            case 'bothify':
-                $format = $columnConfig['format'] ?? '##??';
-
-                return $this->faker->bothify($format);
-
-            case 'regexify':
-                $regex = $columnConfig['regex'] ?? '[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}';
-
-                return $this->faker->regexify($regex);
-
-            case 'creditCardNumber':
-                return $this->faker->creditCardNumber();
-
-            case 'company':
-                return $this->faker->company();
-
-            case 'url':
-                return $this->faker->url();
-
-            case 'ipv4':
-                return $this->faker->ipv4();
-
-            case 'ipv6':
-                return $this->faker->ipv6();
-
-            case 'uuid':
-                return $this->faker->uuid();
-
-            case 'password':
-                // Returns a bcrypt hash of a random password
-                return password_hash($this->faker->password(), PASSWORD_BCRYPT);
-
-            default:
-                return $this->faker->text(50);
-        }
-    }
-
-    /**
-     * Format a value for SQL.
-     *
-     * @param  mixed  $value
-     * @return string
-     */
-    protected function formatSqlValue($value)
-    {
-        if ($value === null) {
-            return 'NULL';
-        }
-
-        if (is_bool($value)) {
-            return $value ? '1' : '0';
-        }
-
-        if (is_numeric($value)) {
-            return $value;
-        }
-
-        // Escape single quotes and other special characters
-        return "'".addslashes($value)."'";
-    }
-
-    /**
-     * Get CREATE TABLE statement for a table.
-     *
-     * @param  string  $table
-     * @return string
-     */
-    protected function getCreateTableSql($table)
-    {
-        if ($this->connection->getDriverName() === 'sqlite') {
-            // For SQLite, get the table structure
-            $columns = $this->connection->getSchemaBuilder()->getColumnListing($table);
-            $createTable = "CREATE TABLE `{$table}` (";
-
-            foreach ($columns as $column) {
-                $type = $this->connection->getSchemaBuilder()->getColumnType($table, $column);
-                $createTable .= "\n  `{$column}` {$type},";
-            }
-
-            // Remove the last comma and close the statement
-            $createTable = rtrim($createTable, ',')."\n);";
-
-            return "DROP TABLE IF EXISTS `{$table}`;\n{$createTable}";
-        } else {
-            // For MySQL and other databases
-            $result = DB::select("SHOW CREATE TABLE `{$table}`");
-            $createTableSql = $result[0]->{'Create Table'} ?? $result[0]->{'Create View'};
-
-            return "DROP TABLE IF EXISTS `{$table}`;\n{$createTableSql};";
-        }
-    }
-
-    /**
-     * Initialize the SQL file with header.
-     *
-     * @param  string  $outputFile
-     * @return void
-     */
-    protected function initSqlFile($outputFile)
-    {
-        $header = "-- Database Masked Dump\n";
-        $header .= '-- Generated on: '.date('Y-m-d H:i:s')."\n";
-        $header .= "-- By: Laravel Database Masker\n\n";
-        $header .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
-
-        file_put_contents($outputFile, $header);
-    }
-
-    /**
-     * Get all database tables.
-     *
-     * @return array
-     */
-    protected function getTables()
-    {
-        $tables = [];
-        $excludeTables = $this->config['exclude_tables'] ?? [];
-        $connection = $this->connection;
-
-        // Different query based on database driver
-        if ($connection->getDriverName() === 'sqlite') {
-            $rawTables = $connection->select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            foreach ($rawTables as $tableObj) {
-                $tableName = $tableObj->name;
-                if (! in_array($tableName, $excludeTables)) {
-                    $tables[] = $tableName;
-                }
-            }
-        } else {
-            // MySQL, PostgreSQL, etc.
-            $dbName = $connection->getDatabaseName();
-            $rawTables = $connection->select('SHOW TABLES');
-
-            $tableNameKey = "Tables_in_{$dbName}";
-            foreach ($rawTables as $tableObj) {
-                $tableName = $tableObj->$tableNameKey;
-                if (! in_array($tableName, $excludeTables)) {
-                    $tables[] = $tableName;
-                }
-            }
-        }
-
-        return $tables;
-    }
-
-    /**
-     * Get column type from database schema.
-     *
-     * @param  string  $table
-     * @param  string  $column
-     * @return string
-     */
-    protected function getColumnType($table, $column)
-    {
-        $schema = DB::connection()->getDoctrineSchemaManager();
-        $columns = $schema->listTableColumns($table);
-
-        if (! isset($columns[$column])) {
-            return 'string';
-        }
-
-        $doctrineType = $columns[$column]->getType()->getName();
-
-        // Map Doctrine type to a simpler type
-        $typeMap = [
-            'string' => 'string',
-            'text' => 'text',
-            'integer' => 'integer',
-            'smallint' => 'integer',
-            'bigint' => 'integer',
-            'boolean' => 'boolean',
-            'decimal' => 'float',
-            'float' => 'float',
-            'date' => 'date',
-            'datetime' => 'datetime',
-            'datetimetz' => 'datetime',
-            'time' => 'time',
-            'array' => 'array',
-            'json' => 'json',
-        ];
-
-        return $typeMap[$doctrineType] ?? 'string';
+        return $connections;
     }
 }

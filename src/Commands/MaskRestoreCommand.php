@@ -1,18 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hristijans\DatabaseMasker\Commands;
 
-use Hristijans\DatabaseMasker\Facades\DatabaseMasker;
+use Hristijans\DatabaseMasker\Contracts\DatabaseMaskerInterface;
 use Illuminate\Console\Command;
 
-class MaskRestoreCommand extends Command
+final class MaskRestoreCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'db:mask-restore 
+    protected $signature = 'db:mask-restore
+                            {--connection= : Database connection to restore to}
                             {--input= : Input file path (default: storage/app/masked_database.sql)}
                             {--no-dump : Skip creating dump and use existing file}
                             {--config= : Custom config file path}
@@ -26,11 +29,23 @@ class MaskRestoreCommand extends Command
     protected $description = 'Create and restore a masked database dump in one step';
 
     /**
-     * Execute the console command.
-     *
-     * @return int
+     * The database masker service.
      */
-    public function handle()
+    private DatabaseMaskerInterface $databaseMasker;
+
+    /**
+     * Create a new command instance.
+     */
+    public function __construct(DatabaseMaskerInterface $databaseMasker)
+    {
+        parent::__construct();
+        $this->databaseMasker = $databaseMasker;
+    }
+
+    /**
+     * Execute the console command.
+     */
+    public function handle(): int
     {
         // Load custom config if provided
         if ($configPath = $this->option('config')) {
@@ -45,23 +60,61 @@ class MaskRestoreCommand extends Command
         }
 
         try {
+            $connectionName = $this->option('connection') ?? config('database.default');
             $inputFile = $this->option('input');
 
             // Create dump if needed
             if (! $this->option('no-dump')) {
-                $this->info('Creating masked database dump...');
+                $this->info("Creating masked database dump for connection: {$connectionName}...");
+
+                // Get connection config
+                $connections = config('database-masker.connections', []);
+                $connectionConfig = $connections[$connectionName] ?? null;
+
+                if (! $connectionConfig && empty($connections)) {
+                    // Use default top-level config if no connections defined
+                    $connectionConfig = [
+                        'tables' => config('database-masker.tables', []),
+                        'exclude_tables' => config('database-masker.exclude_tables', []),
+                    ];
+                }
+
+                if (! $connectionConfig) {
+                    $this->error("Connection '{$connectionName}' not found in configuration.");
+
+                    return 1;
+                }
+
                 $startTime = microtime(true);
-                $dumpFile = DatabaseMasker::createMaskedDump($inputFile);
+
+                $result = $this->databaseMasker->createMaskedDumpForConnection(
+                    $connectionName,
+                    $connectionConfig,
+                    $inputFile
+                );
+
                 $endTime = microtime(true);
 
-                $this->info("Masked database dump created: {$dumpFile}");
-                $this->info('Time taken: '.round($endTime - $startTime, 2).' seconds');
+                if ($result['status'] === 'success') {
+                    $this->info("Masked database dump created: {$result['output_file']}");
+                    $this->info('Time taken: '.round($endTime - $startTime, 2).' seconds');
 
-                // Use the created dump file
-                $inputFile = $dumpFile;
+                    // Use the created dump file
+                    $inputFile = $result['output_file'];
+                } else {
+                    $this->error("Failed to create masked database dump: {$result['error']}");
+
+                    return 1;
+                }
             } else {
                 if (! $inputFile) {
-                    $inputFile = storage_path('app/masked_database.sql');
+                    // Try to guess the input file based on connection name
+                    $inputFile = storage_path("app/masked_database_{$connectionName}.sql");
+
+                    if (! file_exists($inputFile)) {
+                        // Fall back to legacy path
+                        $inputFile = storage_path('app/masked_database.sql');
+                    }
                 }
 
                 if (! file_exists($inputFile)) {
@@ -71,20 +124,21 @@ class MaskRestoreCommand extends Command
                 }
             }
 
-            $this->info('Restoring masked database...');
+            $this->info("Restoring masked database to connection: {$connectionName}...");
 
             // Confirm before overwriting the database
-            if (! $this->option('force') && ! $this->confirm('This will overwrite your current database. Are you sure?', true)) {
+            if (! $this->option('force') && ! $this->confirm("This will overwrite the database for connection '{$connectionName}'. Are you sure?", true)) {
                 $this->info('Operation cancelled.');
 
                 return 0;
             }
 
             $startTime = microtime(true);
-            DatabaseMasker::restoreMaskedDump($inputFile);
+            $this->databaseMasker->restoreMaskedDump($inputFile, $connectionName);
             $endTime = microtime(true);
 
             $this->info('Database restored successfully with masked data!');
+            $this->info("Connection: {$connectionName}");
             $this->info('Time taken: '.round($endTime - $startTime, 2).' seconds');
 
             return 0;
