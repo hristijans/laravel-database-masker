@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hristijans\DatabaseMasker\Exceptions;
 
-class UnsupportedDatabaseDriverException
-{
+use Exception;
 
+final class UnsupportedDatabaseDriverException extends Exception
+{
+    //
 }

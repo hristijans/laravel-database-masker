@@ -108,8 +108,8 @@ final class DatabaseMasker implements DatabaseMaskerInterface
         $driver = $this->driverFactory->createDriver($connection, $connectionName);
 
         // Set output file
-        if (! $outputFile) {
-            $outputFile = storage_path('app/masked_database_'.$connectionName.'.sql');
+        if (!$outputFile) {
+            $outputFile = storage_path('app/masked_database_' . $connectionName . '.sql');
         }
 
         // Start the SQL file with header
@@ -117,21 +117,32 @@ final class DatabaseMasker implements DatabaseMaskerInterface
 
         // Get all tables excluding the ones in the exclude list
         $excludeTables = $connectionConfig['exclude_tables'] ?? [];
-        $tables = $driver->getTables($excludeTables);
+        $allTables = $driver->getTables($excludeTables);
+
+        // Get configured tables - these are the ones with masking rules
+        $configuredTables = array_keys($connectionConfig['tables'] ?? []);
+
+        // IMPORTANT CHANGE: Process ALL tables, not just configured ones
+        // Instead of filtering tables, we'll just use null tableConfig for non-configured tables
+        $tables = $allTables;
+
+        \Log::info('All tables: ' . implode(', ', $allTables));
+        \Log::info('Configured tables: ' . implode(', ', $configuredTables));
 
         $tablesProcessed = 0;
         foreach ($tables as $table) {
-            // If tables are explicitly configured, only process those
-            $configuredTables = array_keys($connectionConfig['tables'] ?? []);
-            if (! empty($configuredTables) && ! in_array($table, $configuredTables)) {
-                continue;
-            }
+            // Get table config if it exists, otherwise null
+            $tableConfig = in_array($table, $configuredTables)
+                ? $connectionConfig['tables'][$table]
+                : null;
+
+            \Log::info("Processing table: {$table}" . ($tableConfig ? ' (with masking)' : ' (without masking)'));
 
             $this->processMaskTable(
                 $driver,
                 $table,
                 $outputFile,
-                $connectionConfig['tables'][$table] ?? null
+                $tableConfig
             );
             $tablesProcessed++;
         }
@@ -154,7 +165,7 @@ final class DatabaseMasker implements DatabaseMaskerInterface
      */
     public function createMaskedDump(?string $outputFile = null): string
     {
-        if (! $outputFile) {
+        if (!$outputFile) {
             $outputFile = $this->tempSqlFile;
         }
 
@@ -164,6 +175,11 @@ final class DatabaseMasker implements DatabaseMaskerInterface
             'tables' => $this->config['tables'] ?? [],
             'exclude_tables' => $this->config['exclude_tables'] ?? [],
         ];
+
+        // IMPORTANT: Make sure the config is using the current values
+        $this->config = config('database-masker');
+
+        \Log::info('Creating masked dump with tables: ' . implode(', ', array_keys($connectionConfig['tables'])));
 
         $result = $this->createMaskedDumpForConnection($defaultConnection, $connectionConfig, $outputFile);
 
@@ -248,18 +264,19 @@ final class DatabaseMasker implements DatabaseMaskerInterface
      */
     private function getConfiguredConnections(): array
     {
+        $this->config = config('database-masker');
+
         $connections = $this->config['connections'] ?? [];
 
         // If no connections are explicitly configured, use the default connection
         // with the top-level tables configuration
         if (empty($connections)) {
             $defaultConnection = config('database.default');
-
             return [
                 $defaultConnection => [
                     'tables' => $this->config['tables'] ?? [],
                     'exclude_tables' => $this->config['exclude_tables'] ?? [],
-                ],
+                ]
             ];
         }
 
