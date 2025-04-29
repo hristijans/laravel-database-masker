@@ -1,16 +1,23 @@
 # Laravel Database Masker
 
-
-A Laravel package for creating masked database dumps with sensitive data obfuscated. Perfect for providing realistic data to developers without exposing confidential information.
+A Laravel package for creating masked database dumps with sensitive data obfuscated, following modern PHP 8.3 best practices. Perfect for providing realistic data to developers without exposing confidential information.
 
 ## Features
 
 - **Selective Column Masking**: Configure which columns in which tables contain sensitive data
 - **Type-Aware Masking**: Automatically generates appropriate fake data based on column types
+- **Multiple Database Support**: Process multiple database connections at once
+- **Modern Architecture**: Uses design patterns (Strategy, Factory, Template) for maintainable, extensible code
+- **PHP 8.3 Ready**: Leverages the latest PHP features with strict typing
+- **Database Agnostic**: Supports MySQL, PostgreSQL, and SQLite
 - **Relationship Preservation**: Maintains database relationships and integrity
-- **Configurable**: Highly customizable with simple configuration
 - **Performance Optimized**: Processes large databases efficiently with batching
 - **Developer-Friendly**: Easy to use Artisan commands for creating and restoring masked dumps
+
+## Requirements
+
+- PHP 8.3+
+- Laravel 10.0+
 
 ## Installation
 
@@ -28,7 +35,11 @@ php artisan vendor:publish --provider="Hristijans\DatabaseMasker\DatabaseMaskerS
 
 ## Configuration
 
-Edit the published configuration file at `config/database-masker.php` to define which tables and columns contain sensitive data that should be masked:
+Edit the published configuration file at `config/database-masker.php` to define which tables and columns contain sensitive data that should be masked.
+
+### Single Database Configuration
+
+For simple projects with a single database:
 
 ```php
 return [
@@ -57,6 +68,48 @@ return [
 ];
 ```
 
+### Multiple Database Configuration
+
+For projects with multiple database connections:
+
+```php
+return [
+    'connections' => [
+        'mysql' => [
+            'tables' => [
+                'users' => [
+                    'columns' => [
+                        'email' => ['type' => 'email'],
+                        'name' => ['type' => 'name'],
+                    ],
+                ],
+            ],
+            'exclude_tables' => ['migrations', 'failed_jobs'],
+            'output_file' => 'masked_mysql.sql',
+        ],
+        'customer_db' => [
+            'tables' => [
+                'customers' => [
+                    'columns' => [
+                        'email' => ['type' => 'email'],
+                        'first_name' => ['type' => 'firstName'],
+                        'last_name' => ['type' => 'lastName'],
+                    ],
+                ],
+            ],
+            'exclude_tables' => ['migrations'],
+            'output_file' => 'masked_customer_db.sql',
+        ],
+    ],
+    
+    // Global configuration
+    'preserve_primary_keys' => true,
+    'preserve_foreign_keys' => true,
+    'batch_size' => 1000,
+    'output_path' => storage_path('app'),
+];
+```
+
 ## Available Mask Types
 
 The package supports various mask types for different kinds of data:
@@ -67,7 +120,7 @@ The package supports various mask types for different kinds of data:
 | `name` | Replaces with a fake full name | - |
 | `firstName` | Replaces with a fake first name | - |
 | `lastName` | Replaces with a fake last name | - |
-| `phone` | Replaces with a fake phone number | - |
+| `phone` | Replaces with a fake phone number | `format`: e.g., '###-###-####' |
 | `address` | Replaces with a fake address | - |
 | `city` | Replaces with a fake city name | - |
 | `country` | Replaces with a fake country name | - |
@@ -90,7 +143,9 @@ The package supports various mask types for different kinds of data:
 
 ## Usage
 
-### Creating a Masked Database Dump
+### Single Database
+
+#### Creating a Masked Database Dump
 
 To create a masked database dump:
 
@@ -104,7 +159,7 @@ By default, the dump will be saved to `storage/app/masked_database.sql`. You can
 php artisan db:mask-dump --output=/path/to/output.sql
 ```
 
-### Creating and Restoring a Masked Database in One Step
+#### Creating and Restoring a Masked Database in One Step
 
 To create a masked database dump and immediately restore it to your local database:
 
@@ -126,6 +181,42 @@ To skip the confirmation prompt, use the `--force` option:
 php artisan db:mask-restore --force
 ```
 
+### Multiple Databases
+
+#### Creating Masked Database Dumps for All Configured Connections
+
+To create masked dumps for all configured database connections:
+
+```bash
+php artisan db:mask-dump
+```
+
+This will generate a separate SQL file for each connection, with the filenames specified in your configuration.
+
+#### Creating a Masked Database Dump for a Specific Connection
+
+To create a masked dump for a specific database connection:
+
+```bash
+php artisan db:mask-dump --connection=customer_db
+```
+
+#### Specifying an Output Directory
+
+You can specify a custom output directory for all dump files:
+
+```bash
+php artisan db:mask-dump --output-path=/path/to/directory
+```
+
+#### Restoring a Masked Database to a Specific Connection
+
+To restore a masked dump to a specific connection:
+
+```bash
+php artisan db:mask-restore --connection=customer_db
+```
+
 ### Using a Custom Configuration File
 
 You can specify a custom configuration file for one-off operations:
@@ -134,13 +225,62 @@ You can specify a custom configuration file for one-off operations:
 php artisan db:mask-dump --config=/path/to/custom-config.php
 ```
 
+## Extending the Package
+
+### Adding Custom Mask Types
+
+You can extend the package with your own masking strategies:
+
+```php
+use Hristijans\DatabaseMasker\Contracts\ValueMaskerInterface;
+use Faker\Factory as FakerFactory;
+
+class MyCustomMasker implements ValueMaskerInterface
+{
+    private $faker;
+    
+    public function __construct()
+    {
+        $this->faker = FakerFactory::create();
+    }
+    
+    public function canHandle(string $type): bool
+    {
+        return $type === 'my_custom_type';
+    }
+    
+    public function mask(mixed $originalValue, array $columnConfig): mixed
+    {
+        // Your custom masking logic here
+        return "masked_{$originalValue}";
+    }
+}
+```
+
+Then register it with the MaskerStrategyFactory:
+
+```php
+// In a service provider
+use Hristijans\DatabaseMasker\Services\Factories\MaskerStrategyFactory;
+
+public function boot(): void
+{
+    $this->app->make(MaskerStrategyFactory::class)
+        ->registerMasker(new MyCustomMasker());
+}
+```
+
+### Supporting Additional Database Types
+
+To add support for additional database types, implement the `DatabaseDriverInterface` and update the `DatabaseDriverFactory`.
+
 ## Example Workflow for New Developers
 
 When a new developer joins the team:
 
 1. The senior developer runs `php artisan db:mask-dump` on production (or a copy)
-2. The masked SQL dump is provided to the new developer
-3. The new developer imports the masked dump into their local environment
+2. The masked SQL dump(s) are provided to the new developer
+3. The new developer imports the masked dump(s) into their local environment
 4. The new developer can now work with realistic data without seeing confidential information
 
 ## Using with Large Databases
@@ -159,22 +299,9 @@ This helps to reduce memory usage when processing large tables.
 composer test
 ```
 
-## Changelog
-
-Please see [CHANGELOG.md](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## Security
 
-If you discover any security-related issues, please email kde.chris@gmail.com instead of using the issue tracker.
-
-## Credits
-
-- [Hristijan Stojanoski](https://github.com/hristijans)
-
+If you discover any security issues, please email kde.chris@gmail.com instead of using the issue tracker.
 
 ## License
 
