@@ -27,9 +27,9 @@ class DatabaseMaskerTest extends TestCase
 
         // Clean up any test files
         $files = [
-            $storagePath . '/app/masked_testing_cmd.sql',
-            $storagePath . '/app/masked_second_db_cmd.sql',
-            $storagePath . '/app/custom_output.sql',
+            $storagePath.'/app/masked_testing_cmd.sql',
+            $storagePath.'/app/masked_second_db_cmd.sql',
+            $storagePath.'/app/custom_output.sql',
         ];
 
         foreach ($files as $file) {
@@ -106,7 +106,6 @@ class DatabaseMaskerTest extends TestCase
             ->createDriver(DB::connection($defaultConnection), $defaultConnection);
         $allTables = $driver->getTables([]);
 
-
         // Get the config the DatabaseMasker will use
         $configuredTables = config('database-masker.tables');
 
@@ -119,11 +118,9 @@ class DatabaseMaskerTest extends TestCase
         // Read file content
         $content = file_get_contents($dumpFile);
 
-
         // Search for specific table markers in the content
         $hasUsersTable = strpos($content, 'test_users') !== false;
         $hasCustomersTable = strpos($content, 'test_customers') !== false;
-
 
         // Now run the actual assertions
         $this->assertStringContainsString('test_users', $content, 'test_users table not found in dump');
@@ -254,10 +251,8 @@ class DatabaseMaskerTest extends TestCase
         $this->assertArrayHasKey('testing', $connections);
         $this->assertArrayHasKey('second_db', $connections);
 
-
         // Now get the connections using the actual method
         $result = $this->invokeMethod($this->databaseMasker, 'getConfiguredConnections', []);
-
 
         // Assertions
         $this->assertArrayHasKey('testing', $result);

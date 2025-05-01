@@ -108,8 +108,8 @@ final class DatabaseMasker implements DatabaseMaskerInterface
         $driver = $this->driverFactory->createDriver($connection, $connectionName);
 
         // Set output file
-        if (!$outputFile) {
-            $outputFile = storage_path('app/masked_database_' . $connectionName . '.sql');
+        if (! $outputFile) {
+            $outputFile = storage_path('app/masked_database_'.$connectionName.'.sql');
         }
 
         // Start the SQL file with header
@@ -126,8 +126,8 @@ final class DatabaseMasker implements DatabaseMaskerInterface
         // Instead of filtering tables, we'll just use null tableConfig for non-configured tables
         $tables = $allTables;
 
-        \Log::info('All tables: ' . implode(', ', $allTables));
-        \Log::info('Configured tables: ' . implode(', ', $configuredTables));
+        \Log::info('All tables: '.implode(', ', $allTables));
+        \Log::info('Configured tables: '.implode(', ', $configuredTables));
 
         $tablesProcessed = 0;
         foreach ($tables as $table) {
@@ -136,7 +136,7 @@ final class DatabaseMasker implements DatabaseMaskerInterface
                 ? $connectionConfig['tables'][$table]
                 : null;
 
-            \Log::info("Processing table: {$table}" . ($tableConfig ? ' (with masking)' : ' (without masking)'));
+            \Log::info("Processing table: {$table}".($tableConfig ? ' (with masking)' : ' (without masking)'));
 
             $this->processMaskTable(
                 $driver,
@@ -165,7 +165,7 @@ final class DatabaseMasker implements DatabaseMaskerInterface
      */
     public function createMaskedDump(?string $outputFile = null): string
     {
-        if (!$outputFile) {
+        if (! $outputFile) {
             $outputFile = $this->tempSqlFile;
         }
 
@@ -179,7 +179,7 @@ final class DatabaseMasker implements DatabaseMaskerInterface
         // IMPORTANT: Make sure the config is using the current values
         $this->config = config('database-masker');
 
-        \Log::info('Creating masked dump with tables: ' . implode(', ', array_keys($connectionConfig['tables'])));
+        \Log::info('Creating masked dump with tables: '.implode(', ', array_keys($connectionConfig['tables'])));
 
         $result = $this->createMaskedDumpForConnection($defaultConnection, $connectionConfig, $outputFile);
 
@@ -272,11 +272,12 @@ final class DatabaseMasker implements DatabaseMaskerInterface
         // with the top-level tables configuration
         if (empty($connections)) {
             $defaultConnection = config('database.default');
+
             return [
                 $defaultConnection => [
                     'tables' => $this->config['tables'] ?? [],
                     'exclude_tables' => $this->config['exclude_tables'] ?? [],
-                ]
+                ],
             ];
         }
 

@@ -42,7 +42,7 @@ class CommandTest extends TestCase
 
         // Ensure the storage directory exists
         $storageDir = $this->app->storagePath('app');
-        if (!File::exists($storageDir)) {
+        if (! File::exists($storageDir)) {
             File::makeDirectory($storageDir, 0755, true);
         }
     }
@@ -68,11 +68,10 @@ class CommandTest extends TestCase
         parent::tearDown();
     }
 
-
     /**
      * Test the db:mask-dump command with all connections.
      */
-    public function testMaskDumpCommandForAllConnections(): void
+    public function test_mask_dump_command_for_all_connections(): void
     {
         // Correct storage path
         $storagePath = $this->app->storagePath('app');
@@ -99,30 +98,27 @@ class CommandTest extends TestCase
     /**
      * Test the db:mask-dump command with a specific connection.
      */
-    public function testMaskDumpCommandForSingleConnection(): void
+    public function test_mask_dump_command_for_single_connection(): void
     {
         // Ensure the output directory exists
         $storagePath = $this->app->storagePath('app');
-        if (!File::exists($storagePath)) {
+        if (! File::exists($storagePath)) {
             File::makeDirectory($storagePath, 0755, true);
         }
 
         // Create an absolute path for the output file
-        $outputFile = $storagePath . '/masked_second_db_test.sql';
+        $outputFile = $storagePath.'/masked_second_db_test.sql';
 
         // Run the command with explicit output path
         $this->artisan('db:mask-dump', [
             '--connection' => 'second_db',
-            '--output' => $outputFile
+            '--output' => $outputFile,
         ])->assertExitCode(0);
-
-
 
         // Look in parent directories too
         $parentPath = dirname($storagePath);
 
         $parentFiles = File::files($parentPath);
-
 
         // Check if the file exists
         $this->assertFileExists($outputFile);
@@ -137,7 +133,7 @@ class CommandTest extends TestCase
     /**
      * Test the db:mask-dump command with a custom output path.
      */
-    public function testMaskDumpCommandWithCustomOutput(): void
+    public function test_mask_dump_command_with_custom_output(): void
     {
         // Correct storage path
         $storagePath = $this->app->storagePath('app');
@@ -146,7 +142,7 @@ class CommandTest extends TestCase
         // Run the command with custom output
         $this->artisan('db:mask-dump', [
             '--connection' => 'testing',
-            '--output' => $customOutput
+            '--output' => $customOutput,
         ])
             ->assertExitCode(0);
 

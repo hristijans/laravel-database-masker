@@ -20,12 +20,12 @@ class DatabaseDriverTest extends TestCase
         parent::tearDown();
     }
 
-/**
-* Test the format SQL value method.
-*/
-    public function testFormatSqlValue(): void
+    /**
+     * Test the format SQL value method.
+     */
+    public function test_format_sql_value(): void
     {
-        $maskerFactory = new MaskerStrategyFactory();
+        $maskerFactory = new MaskerStrategyFactory;
         $driver = new MySqlDriver($maskerFactory);
 
         // Test NULL value
@@ -47,13 +47,13 @@ class DatabaseDriverTest extends TestCase
     /**
      * Test the generate SQL statements method.
      */
-    public function testGenerateInsertSql(): void
+    public function test_generate_insert_sql(): void
     {
         // Create mocks
         $connection = Mockery::mock(Connection::class);
         $connection->shouldReceive('getDriverName')->andReturn('mysql');
 
-        $maskerFactory = new MaskerStrategyFactory();
+        $maskerFactory = new MaskerStrategyFactory;
         $driver = new MySqlDriver($maskerFactory);
 
         // Initialize the driver with a mock connection
@@ -61,19 +61,19 @@ class DatabaseDriverTest extends TestCase
 
         // Create test data
         $records = new Collection([
-            (object)[
+            (object) [
                 'id' => 1,
                 'name' => 'Test User',
-                'email' => 'test@example.com'
-            ]
+                'email' => 'test@example.com',
+            ],
         ]);
 
         // Define table configuration
         $tableConfig = [
             'columns' => [
                 'email' => ['type' => 'email'],
-                'name' => ['type' => 'name']
-            ]
+                'name' => ['type' => 'name'],
+            ],
         ];
 
         // Create a schema mock that's specific to just this test

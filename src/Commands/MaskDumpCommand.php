@@ -48,8 +48,9 @@ final class MaskDumpCommand extends Command
     {
         // Load custom config if provided
         if ($configPath = $this->option('config')) {
-            if (!file_exists($configPath)) {
+            if (! file_exists($configPath)) {
                 $this->error("Config file not found: {$configPath}");
+
                 return 1;
             }
 
@@ -69,7 +70,7 @@ final class MaskDumpCommand extends Command
                 $connections = config('database-masker.connections', []);
                 $connectionConfig = $connections[$specificConnection] ?? null;
 
-                if (!$connectionConfig && empty($connections)) {
+                if (! $connectionConfig && empty($connections)) {
                     // Use default top-level config if no connections defined
                     $connectionConfig = [
                         'tables' => config('database-masker.tables', []),
@@ -77,8 +78,9 @@ final class MaskDumpCommand extends Command
                     ];
                 }
 
-                if (!$connectionConfig) {
+                if (! $connectionConfig) {
                     $this->error("Connection '{$specificConnection}' not found in configuration.");
+
                     return 1;
                 }
 
@@ -104,11 +106,11 @@ final class MaskDumpCommand extends Command
             }
 
             $endTime = microtime(true);
-            $this->info("Total time taken: " . round($endTime - $startTime, 2) . " seconds");
+            $this->info('Total time taken: '.round($endTime - $startTime, 2).' seconds');
 
             return 0;
         } catch (\Exception $e) {
-            $this->error("Error creating masked database dump: " . $e->getMessage());
+            $this->error('Error creating masked database dump: '.$e->getMessage());
 
             if ($this->getOutput()->isVerbose()) {
                 $this->error($e->getTraceAsString());
@@ -121,7 +123,7 @@ final class MaskDumpCommand extends Command
     /**
      * Display the result of a database dump operation.
      *
-     * @param array{status: string, connection: string, output_file?: string, tables_processed?: int, error?: string} $result
+     * @param  array{status: string, connection: string, output_file?: string, tables_processed?: int, error?: string}  $result
      */
     private function displayResult(array $result): void
     {

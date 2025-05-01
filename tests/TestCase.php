@@ -12,7 +12,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Get package providers.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @return array<int, class-string>
      */
     protected function getPackageProviders($app): array
@@ -25,24 +25,23 @@ abstract class TestCase extends BaseTestCase
     /**
      * Define environment setup.
      *
-     * @param \Illuminate\Foundation\Application $app
-     * @return void
+     * @param  \Illuminate\Foundation\Application  $app
      */
     protected function defineEnvironment($app): void
     {
         // Setup default database to use sqlite :memory:
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
-            'driver'   => 'sqlite',
+            'driver' => 'sqlite',
             'database' => ':memory:',
-            'prefix'   => '',
+            'prefix' => '',
         ]);
 
         // Add a second connection for multi-db testing
         $app['config']->set('database.connections.second_db', [
-            'driver'   => 'sqlite',
+            'driver' => 'sqlite',
             'database' => ':memory:',
-            'prefix'   => '',
+            'prefix' => '',
         ]);
 
         // Set up the base config
@@ -151,10 +150,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Invoke a protected method on an object.
      *
-     * @param object $object
-     * @param string $methodName
-     * @param array<int, mixed> $parameters
-     * @return mixed
+     * @param  array<int, mixed>  $parameters
      */
     protected function invokeMethod(object $object, string $methodName, array $parameters = []): mixed
     {
@@ -167,10 +163,6 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Access a protected property on an object.
-     *
-     * @param object $object
-     * @param string $propertyName
-     * @return mixed
      */
     protected function getProtectedProperty(object $object, string $propertyName): mixed
     {
@@ -183,11 +175,6 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Set a protected property on an object.
-     *
-     * @param object $object
-     * @param string $propertyName
-     * @param mixed $value
-     * @return void
      */
     protected function setProtectedProperty(object $object, string $propertyName, mixed $value): void
     {

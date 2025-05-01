@@ -52,6 +52,9 @@ abstract class AbstractDatabaseDriver implements DatabaseDriverInterface
         return match (true) {
             $value === null => 'NULL',
             is_bool($value) => $value ? '1' : '0',
+            // Always quote values for these columns, regardless of content
+            // Another option is to ensure string values are always quoted
+            is_string($value) => "'".addslashes($value)."'",
             is_numeric($value) => (string) $value,
             default => "'".addslashes((string) $value)."'"
         };
