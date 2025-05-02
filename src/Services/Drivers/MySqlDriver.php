@@ -50,8 +50,11 @@ final class MySqlDriver extends AbstractDatabaseDriver
     {
         parent::initSqlFile($outputFile, $connectionName);
 
-        // Add MySQL-specific settings
-        $mysqlSettings = "SET FOREIGN_KEY_CHECKS=0;\n\n";
+        // Add MySQL-specific settings for proper UTF-8 handling
+        $mysqlSettings = "SET NAMES utf8mb4;\n";
+        $mysqlSettings .= "SET CHARACTER SET utf8mb4;\n";
+        $mysqlSettings .= "SET SESSION character_set_server = utf8mb4;\n";
+        $mysqlSettings .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
         file_put_contents($outputFile, $mysqlSettings, FILE_APPEND);
     }
 
