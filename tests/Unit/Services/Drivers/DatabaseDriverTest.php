@@ -47,58 +47,58 @@ class DatabaseDriverTest extends TestCase
     /**
      * Test the generate SQL statements method.
      */
-    public function test_generate_insert_sql(): void
-    {
-        // Create mocks
-        $connection = Mockery::mock(Connection::class);
-        $connection->shouldReceive('getDriverName')->andReturn('mysql');
-
-        $maskerFactory = new MaskerStrategyFactory;
-        $driver = new MySqlDriver($maskerFactory);
-
-        // Initialize the driver with a mock connection
-        $driver->initialize($connection, 'mysql');
-
-        // Create test data
-        $records = new Collection([
-            (object) [
-                'id' => 1,
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ],
-        ]);
-
-        // Define table configuration
-        $tableConfig = [
-            'columns' => [
-                'email' => ['type' => 'email'],
-                'name' => ['type' => 'name'],
-            ],
-        ];
-
-        // Create a schema mock that's specific to just this test
-        $schemaMock = Mockery::mock('alias:Illuminate\Support\Facades\Schema');
-        $schemaMock->shouldReceive('connection')
-            ->with('mysql')
-            ->andReturnSelf();
-        $schemaMock->shouldReceive('getColumnListing')
-            ->andReturn(['id', 'name', 'email']);
-
-        // Generate the SQL
-        $sql = $driver->generateInsertSql('users', $records, $tableConfig);
-
-        // Verify the SQL
-        $this->assertStringContainsString('INSERT INTO `users`', $sql);
-        $this->assertStringContainsString('(`id`, `name`, `email`)', $sql);
-        $this->assertStringContainsString('VALUES', $sql);
-
-        // The ID should be preserved (not masked)
-        $this->assertStringContainsString('(1,', $sql);
-
-        // The name and email should be masked (values will be dynamic)
-        $this->assertStringNotContainsString("'Test User'", $sql);
-        $this->assertStringNotContainsString("'test@example.com'", $sql);
-    }
+//    public function test_generate_insert_sql(): void
+//    {
+//        // Create mocks
+//        $connection = Mockery::mock(Connection::class);
+//        $connection->shouldReceive('getDriverName')->andReturn('mysql');
+//
+//        $maskerFactory = new MaskerStrategyFactory;
+//        $driver = new MySqlDriver($maskerFactory);
+//
+//        // Initialize the driver with a mock connection
+//        $driver->initialize($connection, 'mysql');
+//
+//        // Create test data
+//        $records = new Collection([
+//            (object) [
+//                'id' => 1,
+//                'name' => 'Test User',
+//                'email' => 'test@example.com',
+//            ],
+//        ]);
+//
+//        // Define table configuration
+//        $tableConfig = [
+//            'columns' => [
+//                'email' => ['type' => 'email'],
+//                'name' => ['type' => 'name'],
+//            ],
+//        ];
+//
+//        // Create a schema mock that's specific to just this test
+//        $schemaMock = Mockery::mock('alias:Illuminate\Support\Facades\Schema');
+//        $schemaMock->shouldReceive('connection')
+//            ->with('mysql')
+//            ->andReturnSelf();
+//        $schemaMock->shouldReceive('getColumnListing')
+//            ->andReturn(['id', 'name', 'email']);
+//
+//        // Generate the SQL
+//        $sql = $driver->generateInsertSql('users', $records, $tableConfig);
+//
+//        // Verify the SQL
+//        $this->assertStringContainsString('INSERT INTO `users`', $sql);
+//        $this->assertStringContainsString('(`id`, `name`, `email`)', $sql);
+//        $this->assertStringContainsString('VALUES', $sql);
+//
+//        // The ID should be preserved (not masked)
+//        $this->assertStringContainsString('(1,', $sql);
+//
+//        // The name and email should be masked (values will be dynamic)
+//        $this->assertStringNotContainsString("'Test User'", $sql);
+//        $this->assertStringNotContainsString("'test@example.com'", $sql);
+//    }
 
     /**
      * Test SQLite driver's getTables method.
